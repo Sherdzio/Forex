@@ -1,9 +1,8 @@
 //@version=6
-// ──────────────────────────────────────────────────────────────────────────────
-//  STRATEGY HEADER
-// ──────────────────────────────────────────────────────────────────────────────
-strategy("Trend + MACD + EMA + ADX + ATR-TS  (static boxes, swing-range)",
+strategy(
+     "Trend + MACD + EMA + ADX + ATR-TS (static boxes, swing-range)",
      overlay            = true,
+     scale              = scale.left,   //<── DODAJ TO
      pyramiding         = 0,
      default_qty_type   = strategy.percent_of_equity,
      default_qty_value  = 10,
