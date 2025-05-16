@@ -1,8 +1,6 @@
 //@version=6
-strategy(
-     "Trend + MACD + EMA + ADX + ATR-TS (static boxes, swing-range)",
+strategy("Trend + MACD + EMA + ADX + ATR-TS (static boxes, swing-range)",
      overlay            = true,
-     scale              = scale.left,   //<── DODAJ TO
      pyramiding         = 0,
      default_qty_type   = strategy.percent_of_equity,
      default_qty_value  = 10,
@@ -11,9 +9,9 @@ strategy(
      commission_value   = 0.01,
      initial_capital    = 10000)
 
-// ──────────────────────────────────────────────────────────────────────────────
+// ──────────────────────────────────────────────────────────────────
 //  INPUTS
-// ──────────────────────────────────────────────────────────────────────────────
+// ──────────────────────────────────────────────────────────────────
 trendLen    = input.int  (30 , "Pivot Length / Box Width", minval = 5)
 showBoxes   = input.bool (true, "Draw Boxes?")
 minSwingPct = input.float(0.1 , "Min Swing %", step = 0.1)
@@ -27,7 +25,7 @@ emaSlowLen = input.int  (200, "EMA Slow")
 adxLen     = input.int  (14 , "ADX Length")
 adxThr     = input.float(25 , "ADX Threshold")
 
-// Risk-/MM
+// RISK / MONEY-MANAGEMENT
 rr           = input.float(4.0, "Risk-Reward", step = 0.5)
 slMode       = input.string("ATR", "SL Mode", options = ["ATR","Pivot-ATR","Fixed %"])
 atrSLmult    = input.float(1.0, "ATR Mult",       step = 0.1)
@@ -35,89 +33,83 @@ fixedSLpct   = input.float(1.5, "Fixed SL %",     step = 0.1)
 trailATRmult = input.float(1.0, "ATR-Trail Mult", step = 0.1)
 sess         = input.session("0800-2200", "Active Session")
 
-// Box colours
+// Kolory boxów
 cBoxUp = color.new(color.green, 80)
 cBoxDn = color.new(color.red  , 80)
 
-// ──────────────────────────────────────────────────────────────────────────────
-//  PIVOTS + HELPER FUNKCJE
-// ──────────────────────────────────────────────────────────────────────────────
+// ──────────────────────────────────────────────────────────────────
+//  PIVOTS
+// ──────────────────────────────────────────────────────────────────
 ph = ta.pivothigh(high, trendLen, trendLen)
 pl = ta.pivotlow (low , trendLen, trendLen)
 
 pivotLowConfirmed  () => not na(pl[trendLen]) and  na(pl[trendLen + 1])
 pivotHighConfirmed () => not na(ph[trendLen]) and  na(ph[trendLen + 1])
 
-// ──────────────────────────────────────────────────────────────
-//  STATIC BOXES  (zakotwiczone – nie zmieniają się po narysowaniu)
-// ──────────────────────────────────────────────────────────────
-var box longBox  = na          // ostatni „zielony” swing-up
-var box shortBox = na          // ostatni „czerwony” swing-down
+// ──────────────────────────────────────────────────────────────────
+//  STATIC BOXES – rysowane tylko raz, gdy pivot zostanie potwierdzony
+// ──────────────────────────────────────────────────────────────────
+var box longBox  = na
+var box shortBox = na
 
-// te cztery zmienne liczymy ZAWSZE, żeby kompilator był zadowolony
-int   leftBar   = bar_index - trendLen
-int   rightBar  = bar_index
-float swingHi   = ta.highest(high, trendLen + 1)
-float swingLo   = ta.lowest (low , trendLen + 1)
+int   leftBar  = bar_index - trendLen      // liczymy co bar, aby TV nie ostrzegał
+int   rightBar = bar_index
+float swingHi  = ta.highest(high, trendLen + 1)
+float swingLo  = ta.lowest (low , trendLen + 1)
 
-// ── LONG swing – tworzony raz, w chwili potwierdzenia pivot-low
+// LONG swing
 if showBoxes and pivotLowConfirmed()
-    float botY = pl[trendLen]          // pivot-low
     longBox := box.new(
          left   = leftBar,
          top    = swingHi,
          right  = rightBar,
-         bottom = botY,
+         bottom = pl[trendLen],
          xloc   = xloc.bar_index,
          border_color = color.green,
          bgcolor      = cBoxUp,
          extend       = extend.none)
 
-// ── SHORT swing – tworzony raz, w chwili potwierdzenia pivot-high
+// SHORT swing
 if showBoxes and pivotHighConfirmed()
-    float topY = ph[trendLen]          // pivot-high
     shortBox := box.new(
          left   = leftBar,
-         top    = topY,
+         top    = ph[trendLen],
          right  = rightBar,
          bottom = swingLo,
          xloc   = xloc.bar_index,
          border_color = color.red,
          bgcolor      = cBoxDn,
          extend       = extend.none)
-            // ──────────────────────────────────────────────────────────────────────────────
-//  INDIKATORY
-// ──────────────────────────────────────────────────────────────────────────────
-[macd, macdSig, _] = ta.macd(close, fastLen, slowLen, sigLen)
 
+// ──────────────────────────────────────────────────────────────────
+//  INDIKATORY
+// ──────────────────────────────────────────────────────────────────
+[macd, macdSig, _] = ta.macd(close, fastLen, slowLen, sigLen)
 emaFast = ta.ema(close, emaFastLen)
 emaSlow = ta.ema(close, emaSlowLen)
-
-[_, _, adxVal] = ta.dmi(adxLen, adxLen)           // DI+  DI-  ADX
+[_, _, adxVal] = ta.dmi(adxLen, adxLen)
 atr14 = ta.atr(14)
 
-// (opcjonalne) rysowanie wskaźników
-plot(macd   , title = "MACD"     , color = color.teal   )
-plot(macdSig, title = "Signal"   , color = color.yellow )
-plot(emaFast, title = "EMA Fast" , color = color.orange )
-plot(emaSlow, title = "EMA Slow" , color = color.purple )
+// rysowanie średnich na wykresie ceny
+plot(emaFast, color=color.orange, title="EMA Fast")
+plot(emaSlow, color=color.purple, title="EMA Slow")
 
-// ──────────────────────────────────────────────────────────────────────────────
-//  FILTRY  /  WARUNKI OTWARCIA
-// ──────────────────────────────────────────────────────────────────────────────
+// ──────────────────────────────────────────────────────────────────
+//  FILTRY / SYGNAŁY
+// ──────────────────────────────────────────────────────────────────
 inSess = not na(time(timeframe.period, sess))
 
 bullSwingOK = not na(pl[trendLen]) and
-              ( ta.highest(high, trendLen + 1) - pl[trendLen] ) / pl[trendLen] * 100 >= minSwingPct
+              ( swingHi - pl[trendLen] ) / pl[trendLen] * 100 >= minSwingPct
 
 bearSwingOK = not na(ph[trendLen]) and
-              ( ph[trendLen] - ta.lowest(low, trendLen + 1) )   / ph[trendLen] * 100 >= minSwingPct
+              ( ph[trendLen] - swingLo ) / ph[trendLen] * 100 >= minSwingPct
 
 longCond  = inSess and bullSwingOK and macd > macdSig and emaFast > emaSlow and adxVal > adxThr
 shortCond = inSess and bearSwingOK and macd < macdSig and emaFast < emaSlow and adxVal > adxThr
-// ──────────────────────────────────────────────────────────────────────────────
-//  SL / TP – FUNKCJE POMOCNICZE
-// ──────────────────────────────────────────────────────────────────────────────
+// ──────────────────────────────────────────────────────────────────
+//  FUNKCJE: STOP-LOSS i TAKE-PROFIT
+// ──────────────────────────────────────────────────────────────────
 f_stop(isLong) =>
     float sl = na
     if isLong
@@ -140,23 +132,30 @@ f_tp(isLong, sl) =>
     isLong ? close + rr * math.abs(close - sl)
            : close - rr * math.abs(sl   - close)
 
-// ──────────────────────────────────────────────────────────────────────────────
+// ──────────────────────────────────────────────────────────────────
 //  ZLECENIA
-// ──────────────────────────────────────────────────────────────────────────────
+// ──────────────────────────────────────────────────────────────────
+longSL  = f_stop(true)
+shortSL = f_stop(false)
+
 if longCond and strategy.position_size == 0
-    float s = f_stop(true)
-    float t = f_tp(true, s)
-    strategy.entry("Long" , strategy.long )
-    strategy.exit ("XL"   , "Long", stop = s, limit = t,
+    float longTP = f_tp(true, longSL)
+    strategy.entry("Long", strategy.long)
+    strategy.exit ("XL", "Long",
+                   stop = longSL,
+                   limit = longTP,
                    trail_offset = trailATRmult * atr14)
 
 if shortCond and strategy.position_size == 0
-    float s = f_stop(false)
-    float t = f_tp(false, s)
+    float shortTP = f_tp(false, shortSL)
     strategy.entry("Short", strategy.short)
-    strategy.exit ("XS"   , "Short", stop = s, limit = t,
+    strategy.exit ("XS", "Short",
+                   stop = shortSL,
+                   limit = shortTP,
                    trail_offset = trailATRmult * atr14)
 
-// ──────────────────────────────────────────────────────────────────────────────
-//  KONIEC
-// ──────────────────────────────────────────────────────────────────────────────
+// ──────────────────────────────────────────────────────────────────
+//  KONIEC – dodatkowe ploty diagnostyczne (opcjonalne)
+// ──────────────────────────────────────────────────────────────────
+// plot(macd  , title="MACD" , color=color.teal   , display = display.none)
+// plot(adxVal, title="ADX"  , color=color.yellow , display = display.none)
